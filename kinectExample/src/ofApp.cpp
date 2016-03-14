@@ -151,6 +151,30 @@ void ofApp::draw() {
 
 }
 
+ 
+void exportPlyCloud(string filename, ofMesh& cloud) {
+    ofFile ply;
+    if (ply.open(filename, ofFile::WriteOnly)) {        
+        // write the header
+        ply << "ply" << endl;
+        ply << "format binary_little_endian 1.0" << endl;
+        ply << "element vertex " << cloud.getVertices().size() << endl;
+        ply << "property float x" << endl;
+        ply << "property float y" << endl;
+        ply << "property float z" << endl;
+        ply << "end_header" << endl;
+
+        // write all the vertices
+        vector<ofVec3f>& surface = cloud.getVertices();
+        for(int i = 0; i < surface.size(); i++) {
+            if (surface[i].z != 0) {
+                // write the raw data as if it were a stream of bytes
+                ply.write((char*) &surface[i], sizeof(ofVec3f));
+            }
+        }
+    }
+}
+
 void ofApp::drawPointCloud() {
 	int w = 640;
 	int h = 480;
@@ -176,6 +200,33 @@ void ofApp::drawPointCloud() {
 	ofPopMatrix();
 }
 
+
+void ofApp::capturePointCloud() {
+	int w = 640;
+	int h = 480;
+	ofMesh mesh;
+	mesh.setMode(OF_PRIMITIVE_POINTS);
+	int step = 2;
+	for(int y = 0; y < h; y += step) {
+		for(int x = 0; x < w; x += step) {
+			if(kinect.getDistanceAt(x, y) > 0) {
+				mesh.addColor(kinect.getColorAt(x,y));
+				mesh.addVertex(kinect.getWorldCoordinateAt(x, y));
+			}
+		}
+	}
+	glPointSize(3);
+	ofPushMatrix();
+	// the projected points are 'upside down' and 'backwards'
+	ofScale(1, -1, -1);
+	ofTranslate(0, 0, -1000); // center the points a bit
+	ofEnableDepthTest();
+	mesh.drawVertices();
+	exportPlyCloud("test00.ply", mesh);
+	ofDisableDepthTest();
+	ofPopMatrix();
+}
+
 //--------------------------------------------------------------
 void ofApp::exit() {
 	kinect.setCameraTiltAngle(0); // zero the tilt on exit
@@ -194,9 +245,13 @@ void ofApp::keyPressed (int key) {
 			break;
 
 		case'p':
+			ofLogNotice() << "p was pressed";
 			bDrawPointCloud = !bDrawPointCloud;
 			break;
-
+		case 's':
+			ofLogNotice() << "s was pressed";
+			capturePointCloud();
+			break;
 		case '>':
 		case '.':
 			farThreshold ++;
